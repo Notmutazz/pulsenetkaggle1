@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PulseNet - AI Disaster Intelligence (Kaggle Model)</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { overflow-x: hidden; font-family: 'Inter', sans-serif; background: #0a0f1c; color: #ffffff; }
+    #map { height: 100%; width: 100%; }
+    .page-transition { opacity: 0; transform: translateY(20px); transition: all 0.5s ease; }
+    .page-transition.active { opacity: 1; transform: translateY(0); }
+    .glassmorphism-sidebar { background: rgba(10, 15, 28, 0.7); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5); }
+    .input-field { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 12px 16px; color: white; width: 100%; margin-bottom: 1rem; transition: all 0.3s ease; }
+    .input-field:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+    .modern-btn { position: relative; overflow: hidden; border-radius: 50px; padding: 14px 28px; font-weight: 700; font-size: 1rem; transition: all 0.4s ease; border: 1px solid rgba(255, 255, 255, 0.2); }
+    .modern-btn:hover { transform: translateY(-3px) scale(1.03); }
+    .btn-primary { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .dashboard-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border-radius: 16px; border-left-width: 4px; border-color: transparent; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); transition: all 0.4s ease; }
+    .dashboard-card:hover { transform: translateY(-5px); }
+  </style>
+</head>
+<body class="antialiased">
+
+<div id="app" class="flex flex-col h-screen">
+  <header class="bg-gray-900/50 backdrop-filter backdrop-blur-lg p-4 flex justify-between items-center z-20 border-b border-gray-700">
+    <h1 class="text-2xl font-bold tracking-tight">Pulse<span class="text-green-400">Net</span></h1>
+    <nav class="space-x-2">
+      <button id="homeBtn" class="px-3 py-2 text-gray-300 hover:text-white rounded-md">Home</button>
+      <button id="liveMapBtn" class="px-3 py-2 text-gray-300 hover:text-white rounded-md">Live Map</button>
+      <button id="testBtn" class="px-3 py-2 text-gray-300 hover:text-white rounded-md">Test Model</button>
+    </nav>
+  </header>
+
+  <main class="relative flex-grow overflow-hidden">
+    <div id="landingPage" class="page-transition active absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+      <h2 class="text-5xl md:text-7xl font-extrabold mb-4">AI Disaster Intelligence</h2>
+      <p class="text-lg text-gray-300 mb-8 max-w-2xl">Using a model trained on real-world Kaggle data to predict extreme weather events in Delhi.</p>
+      <button id="landingLiveMapBtn" class="modern-btn btn-primary">Explore Live Risk Map</button>
+    </div>
+
+    <div id="liveMapPage" class="page-transition hidden absolute inset-0 flex">
+      <div id="map" class="flex-grow"></div>
+      <div class="w-96 p-6 overflow-y-auto glassmorphism-sidebar">
+        <h3 class="text-2xl font-bold mb-4">Live Risk Overview</h3>
+        <div class="mb-4">
+          <select id="citySelector" class="input-field text-sm w-full">
+            <option value="Delhi">Delhi, India</option>
+            <option value="Mumbai">Mumbai, India</option>
+            <option value="Chennai">Chennai, India</option>
+            <option value="Bengaluru">Bengaluru, India</option>
+            <option value="Kolkata">Kolkata, India</option>
+          </select>
+        </div>
+        <div id="riskCards" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <div id="testPage" class="page-transition hidden absolute inset-0 overflow-y-auto p-8">
+      <div class="max-w-md mx-auto">
+        <h2 class="text-4xl font-bold text-center mb-8">Test Kaggle AI Model</h2>
+        <div class="p-6 bg-gray-800/50 rounded-lg">
+          <form id="testForm">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-300 mb-2">Mean Temperature (°C)</label>
+              <input type="number" step="0.1" id="meantemp" class="input-field" placeholder="e.g., 25.5" required>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-300 mb-2">Humidity (%)</label>
+              <input type="number" step="0.1" id="humidity" class="input-field" placeholder="e.g., 75.5" required>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-300 mb-2">Wind Speed (km/h)</label>
+              <input type="number" step="0.1" id="wind_speed" class="input-field" placeholder="e.g., 8.2" required>
+            </div>
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-300 mb-2">Mean Pressure (hPa)</label>
+              <input type="number" step="0.1" id="meanpressure" class="input-field" placeholder="e.g., 1010.5" required>
+            </div>
+            <button type="submit" id="testSubmit" class="modern-btn btn-primary w-full">
+              Predict Risk
+            </button>
+          </form>
+          <div id="testResult" class="hidden mt-6 p-4 rounded-lg"></div>
+        </div>
+        </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const pages = { landing: document.getElementById('landingPage'), liveMap: document.getElementById('liveMapPage'), test: document.getElementById('testPage'), };
+  const navButtons = { home: document.getElementById('homeBtn'), liveMap: document.getElementById('liveMapBtn'), test: document.getElementById('testBtn'), landingLiveMap: document.getElementById('landingLiveMapBtn'), };
+  const API_BASE_URL = 'http://127.0.0.1:8000';
+  const cityCoordinates = { 'Bengaluru': [12.9716, 77.5946], 'Mumbai': [19.0760, 72.8777], 'Chennai': [13.0827, 80.2707], 'Delhi': [28.7041, 77.1025], 'Kolkata': [22.5726, 88.3639] };
+  const COLORS = { green: '#10b981', red: '#ef4444' };
+  let map;
+
+  function showPage(pageKey) {
+    Object.values(pages).forEach(p => p.classList.add('hidden'));
+    pages[pageKey].classList.remove('hidden');
+    setTimeout(() => { Object.values(pages).forEach(p => p.classList.remove('active')); pages[pageKey].classList.add('active'); }, 50);
+    if (pageKey === 'liveMap' && !map) initializeMap();
+    if (pageKey === 'liveMap') { setTimeout(() => map.invalidateSize(), 300); fetchAndDisplayRiskData(); }
+  }
+
+  navButtons.home.onclick = () => showPage('landing');
+  navButtons.liveMap.onclick = () => showPage('liveMap');
+  navButtons.test.onclick = () => showPage('test');
+  navButtons.landingLiveMap.onclick = () => showPage('liveMap');
+
+  function initializeMap() {
+    map = L.map('map').setView(cityCoordinates['Delhi'], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CartoDB &copy; OpenStreetMap' }).addTo(map);
+  }
+
+  // --- UPDATED JAVASCRIPT FUNCTIONS FOR KAGGLE MODEL ---
+  function getRiskColor(prediction) {
+    return prediction === 'extreme' ? COLORS.red : COLORS.green;
+  }
+
+  function getRiskText(prediction) {
+    return prediction === 'extreme' ? 'Extreme Weather Risk' : 'Normal Conditions';
+  }
+  // --- END OF UPDATED FUNCTIONS ---
+
+  const citySelector = document.getElementById('citySelector');
+  citySelector.addEventListener('change', fetchAndDisplayRiskData);
+
+  async function fetchAndDisplayRiskData() {
+    const city = citySelector.value;
+    const riskCardsContainer = document.getElementById('riskCards');
+    riskCardsContainer.innerHTML = `<div class="text-center p-4 text-gray-400">Loading data for ${city}...</div>`;
+    try {
+      const response = await fetch(`${API_BASE_URL}/predict-live?city=${city}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Failed to fetch');
+      riskCardsContainer.innerHTML = '';
+      const riskColor = getRiskColor(data.prediction);
+      const card = document.createElement('div');
+      card.className = `dashboard-card p-4`;
+      card.style.borderColor = riskColor;
+      card.innerHTML = `
+        <h4 class="font-bold text-lg">${data.city}</h4>
+        <div class="text-sm text-gray-300 mt-2">
+            <p><strong>Status:</strong> <span style="color:${riskColor}; font-weight: bold;">${getRiskText(data.prediction)}</span></p>
+            <p>🌡️ Temp: ${data.weather.meantemp.toFixed(1)}°C</p>
+            <p>💧 Humidity: ${data.weather.humidity.toFixed(0)}%</p>
+            <p>💨 Wind: ${data.weather.wind_speed.toFixed(1)} km/h</p>
+        </div>`;
+      riskCardsContainer.appendChild(card);
+      if (map) {
+        map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
+        L.marker(cityCoordinates[city]).addTo(map).bindPopup(`<b>${city}</b><br>${getRiskText(data.prediction)}`).openPopup();
+        map.setView(cityCoordinates[city], 11);
+      }
+    } catch (error) {
+      riskCardsContainer.innerHTML = `<div class="p-4 text-red-400">Error: ${error.message}</div>`;
+    }
+  }
+
+  const testForm = document.getElementById('testForm');
+  testForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resultDiv = document.getElementById('testResult');
+    const submitBtn = document.getElementById('testSubmit');
+    submitBtn.textContent = 'Predicting...';
+    submitBtn.disabled = true;
+
+    // --- UPDATED JAVASCRIPT OBJECT FOR KAGGLE MODEL ---
+    const weatherData = {
+      meantemp: parseFloat(document.getElementById('meantemp').value),
+      humidity: parseFloat(document.getElementById('humidity').value),
+      wind_speed: parseFloat(document.getElementById('wind_speed').value),
+      meanpressure: parseFloat(document.getElementById('meanpressure').value)
+    };
+    // --- END OF UPDATED OBJECT ---
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/predict`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(weatherData)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Prediction failed');
+      const riskColor = getRiskColor(data.prediction);
+      resultDiv.innerHTML = `<p class="text-lg font-semibold" style="color:${riskColor};">Result: ${getRiskText(data.prediction)}</p>`;
+      resultDiv.className = 'mt-6 p-4 rounded-lg';
+      resultDiv.style.backgroundColor = `${riskColor}20`;
+      resultDiv.classList.remove('hidden');
+    } catch (error) {
+      resultDiv.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+      resultDiv.className = 'mt-6 p-4 rounded-lg bg-red-900/50';
+      resultDiv.classList.remove('hidden');
+    } finally {
+      submitBtn.textContent = 'Predict Risk';
+      submitBtn.disabled = false;
+    }
+  });
+
+  showPage('landing');
+});
+</script>
+</body>
+</html>
